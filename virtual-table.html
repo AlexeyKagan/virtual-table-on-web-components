@@ -1,0 +1,172 @@
+<template>
+    <style>
+        :host {
+            display: inline-block;
+        }
+
+        .virtual-table {
+            outline: 1px solid blue;
+            overflow: scroll;
+            display: flex;
+            flex-direction: column;
+            height: 400px;
+        }
+
+        .virtual-table__body {
+            position: relative;
+        }
+
+        .virtual-table__header {
+            display: flex;
+            flex-direction: row;
+        }
+
+    </style>
+
+    <div class="virtual-table">
+        <div class="virtual-table__header">
+            asd
+        </div>
+
+        <div class="virtual-table__body">
+
+        </div>
+    </div>
+
+</template>
+
+<script>
+  (() => {
+    const COMPONENT_ATTRS = {
+      columns: [],
+      rows: [],
+    };
+
+    const ownerDocument = document.currentScript.ownerDocument;
+    const template = ownerDocument.querySelector('template');
+
+    class VirtualTable extends HTMLElement {
+      constructor() {
+        super();
+        // @TODO what?
+        this.attachShadow({mode: 'open'});
+        // @TODO what?
+        this.shadowRoot.appendChild(document.importNode(template.content, true));
+
+        this.virtualTable = this.shadowRoot.querySelector('.virtual-table');
+        this.header = this.shadowRoot.querySelector('.virtual-table__header');
+        this.body = this.shadowRoot.querySelector('.virtual-table__body');
+
+        this.rowHeight = 30;
+        this.skipRows = 0;
+        console.log('this', this.shadowRoot.host);
+      }
+
+      static get observedAttributes() {
+        return Object.keys(COMPONENT_ATTRS);
+      }
+
+      get slicedRows() { // rowsChunk
+        return this._slicedRows || [];
+      }
+
+      set slicedRows(rows) {
+        this._slicedRows = rows;
+      }
+
+      get rows() {
+        return this._rows;
+      }
+
+      set rows(rows) {
+        this._rows = rows;
+      }
+
+      get columns() {
+        return this._columns;
+      }
+
+      set columns(columns) {
+        this._columns = columns;
+      }
+
+      connectedCallback() {
+        this.render();
+        this.virtualTable.addEventListener('scroll', this.virtualScroll.bind(this));
+      }
+
+      render() {
+        this.slicedRows = this.rows.slice(0, 20);
+        this.body.style.minHeight = this.rows.length * this.rowHeight + 'px';
+        // this.renderHeader();
+        this.renderBody();
+      }
+
+      virtualScroll(e) {
+        const rows = this.rows;
+        const showRows = Math.round(e.target.offsetHeight / this.rowHeight);
+        const skipRows = Math.round(e.target.scrollTop / this.rowHeight);
+
+        this.slicedRows = rows.slice(skipRows, skipRows + showRows);
+
+        this.skipRows = skipRows;
+
+        [...this.body.children].forEach(child => child.remove());
+
+        this.renderBody();
+      }
+
+      renderBody() {
+        this.renderRows(this.body);
+      }
+
+      renderRows(parent) {
+        const columns = this.columns;
+
+        const rowsList = this.slicedRows.map((row, i) => this.renderRow(row, columns, this.skipRows + i));
+
+        rowsList.forEach(row => parent.appendChild(row));
+      }
+
+      renderRow(row, columns, i) {
+        const rowElement = this.createRow(i);
+        const columnsElementList = columns.map(column => this.renderRowColumn(row, column));
+
+        columnsElementList.forEach(column => rowElement.appendChild(column));
+
+        return rowElement;
+      }
+
+      createRow(i) {
+        const row = document.createElement('div');
+
+        row.style.display = 'flex';
+        row.style.position = 'absolute';
+        row.style.top = this.rowHeight * i + 'px';
+        row.style.height = this.rowHeight + 'px';
+        row.style.width = '100%';
+
+        return row;
+      }
+
+      renderRowColumn(row, column) {
+        const columnElement = document.createElement('div');
+
+        columnElement.style.padding = '10px';
+        columnElement.style.flex = 1;
+        columnElement.style.outline = '1px solid green';
+        columnElement.innerHTML = row[column.key];
+
+        return columnElement;
+      }
+
+      attributeChangedCallback(attr) {
+        this[attr] = JSON.parse(this.getAttribute(attr));
+        this.render();
+      }
+    }
+
+    window.customElements.define('virtual-table', VirtualTable);
+
+  })();
+</script>
