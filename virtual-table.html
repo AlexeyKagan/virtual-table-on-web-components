@@ -25,11 +25,9 @@
 
     <div class="virtual-table">
         <div class="virtual-table__header">
-            asd
         </div>
 
         <div class="virtual-table__body">
-
         </div>
     </div>
 
@@ -37,20 +35,14 @@
 
 <script>
   (() => {
-    const COMPONENT_ATTRS = {
-      columns: [],
-      rows: [],
-    };
-
     const ownerDocument = document.currentScript.ownerDocument;
     const template = ownerDocument.querySelector('template');
 
     class VirtualTable extends HTMLElement {
       constructor() {
         super();
-        // @TODO what?
+
         this.attachShadow({mode: 'open'});
-        // @TODO what?
         this.shadowRoot.appendChild(document.importNode(template.content, true));
 
         this.virtualTable = this.shadowRoot.querySelector('.virtual-table');
@@ -59,19 +51,25 @@
 
         this.rowHeight = 30;
         this.skipRows = 0;
-        console.log('this', this.shadowRoot.host);
+      }
+
+      static getComponentProps() {
+        return {
+          columns: [],
+          rows: [],
+        };
       }
 
       static get observedAttributes() {
-        return Object.keys(COMPONENT_ATTRS);
+        return Object.keys(VirtualTable.getComponentProps());
       }
 
-      get slicedRows() { // rowsChunk
-        return this._slicedRows || [];
+      get rowsChunk() {
+        return this._rowsChunk || [];
       }
 
-      set slicedRows(rows) {
-        this._slicedRows = rows;
+      set rowsChunk(rows) {
+        this._rowsChunk = rows;
       }
 
       get rows() {
@@ -83,7 +81,7 @@
       }
 
       get columns() {
-        return this._columns;
+        return this._columns || [];
       }
 
       set columns(columns) {
@@ -96,9 +94,8 @@
       }
 
       render() {
-        this.slicedRows = this.rows.slice(0, 20);
-        this.body.style.minHeight = this.rows.length * this.rowHeight + 'px';
-        // this.renderHeader();
+        this.rowsChunk = this.rows.slice(0, 20);
+        this.renderHeader();
         this.renderBody();
       }
 
@@ -107,7 +104,7 @@
         const showRows = Math.round(e.target.offsetHeight / this.rowHeight);
         const skipRows = Math.round(e.target.scrollTop / this.rowHeight);
 
-        this.slicedRows = rows.slice(skipRows, skipRows + showRows);
+        this.rowsChunk = rows.slice(skipRows, skipRows + showRows);
 
         this.skipRows = skipRows;
 
@@ -116,23 +113,45 @@
         this.renderBody();
       }
 
+      renderHeader() {
+        this.header.style.height = `${this.rowHeight}px`;
+        this.columns.forEach(column => {
+          const element = this.renderHeaderColumn(column);
+          this.header.appendChild(element);
+        })
+      }
+
+      renderHeaderColumn(column) {
+        const headerColumn = document.createElement('div');
+
+        headerColumn.style.padding = '10px';
+        headerColumn.style.flex = 1;
+        headerColumn.innerHTML = column.title;
+
+        return headerColumn;
+      }
+
       renderBody() {
+        this.body.style.minHeight = `${this.rows.length * this.rowHeight}px`;
+        this.body.style.marginTop = `${this.skipRows ? 0 : this.rowHeight }px`;
+
         this.renderRows(this.body);
       }
 
       renderRows(parent) {
-        const columns = this.columns;
-
-        const rowsList = this.slicedRows.map((row, i) => this.renderRow(row, columns, this.skipRows + i));
-
-        rowsList.forEach(row => parent.appendChild(row));
+        this.rowsChunk.forEach((row, i) => {
+          const rowElement = this.renderRow(row, this.columns, this.skipRows + i);
+          parent.appendChild(rowElement);
+        });
       }
 
       renderRow(row, columns, i) {
         const rowElement = this.createRow(i);
-        const columnsElementList = columns.map(column => this.renderRowColumn(row, column));
 
-        columnsElementList.forEach(column => rowElement.appendChild(column));
+        columns.forEach(column => {
+          const element = this.renderRowColumn(row, column);
+          rowElement.appendChild(element);
+        });
 
         return rowElement;
       }
@@ -142,7 +161,7 @@
 
         row.style.display = 'flex';
         row.style.position = 'absolute';
-        row.style.top = this.rowHeight * i + 'px';
+        row.style.top = (this.rowHeight * i) + 'px';
         row.style.height = this.rowHeight + 'px';
         row.style.width = '100%';
 
